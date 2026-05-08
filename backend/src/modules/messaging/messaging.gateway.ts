@@ -24,9 +24,15 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     try {
       const decoded = await this.firebase.auth.verifyIdToken(token)
-      this.connectedUsers.set(decoded.uid, socket.id)
       socket.data['uid'] = decoded.uid
       socket.join(`user:${decoded.uid}`)
+
+      // Send current online roster to the new client before announcing them
+      this.connectedUsers.forEach((_, uid) => {
+        socket.emit('presence', { uid, online: true })
+      })
+
+      this.connectedUsers.set(decoded.uid, socket.id)
       this.server.emit('presence', { uid: decoded.uid, online: true })
     } catch {
       socket.disconnect()

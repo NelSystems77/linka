@@ -4,9 +4,10 @@ import { useAdmin } from '../hooks/useAdmin'
 import { useAuth } from '@/domains/auth/hooks/useAuth'
 import { signOut } from '@/domains/auth/services/auth.service'
 import { useAuthStore } from '@/domains/auth/store/auth.store'
-import UserManagement from './UserManagement'
-import AuditLog       from './AuditLog'
+import UserManagement  from './UserManagement'
+import AuditLog        from './AuditLog'
 import CreateUserModal from './CreateUserModal'
+import StartChatModal  from './StartChatModal'
 
 type Tab = 'users' | 'audit'
 
@@ -42,7 +43,8 @@ export default function AdminDashboard() {
   const { user }  = useAuth()
   const setUser   = useAuthStore(s => s.setUser)
   const [tab,             setTab]             = useState<Tab>('users')
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showCreateModal,    setShowCreateModal]    = useState(false)
+  const [showStartChatModal, setShowStartChatModal] = useState(false)
 
   const initials = user?.displayName
     .split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() ?? 'A'
@@ -73,6 +75,19 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowStartChatModal(true)}
+              className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl
+                         border border-white/[0.08] text-slate-300 hover:text-white
+                         hover:bg-white/[0.05] transition-all duration-150"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              Iniciar chat
+            </button>
+
             <button
               onClick={() => setShowCreateModal(true)}
               className="btn-primary flex items-center gap-2 text-sm px-4 py-2"
@@ -172,6 +187,13 @@ export default function AdminDashboard() {
           submitting={submitting}
           onClose={() => setShowCreateModal(false)}
           onSubmit={createUser}
+        />
+      )}
+
+      {showStartChatModal && (
+        <StartChatModal
+          users={users}
+          onClose={() => setShowStartChatModal(false)}
         />
       )}
     </div>

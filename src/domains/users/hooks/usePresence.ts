@@ -7,7 +7,8 @@ import type { UserStatus } from '../types/user.types'
 const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'http://localhost:3000'
 
 export function usePresence(uid: string, currentStatus: UserStatus) {
-  const [onlineUids, setOnlineUids] = useState<Set<string>>(new Set())
+  const [onlineUids,      setOnlineUids]      = useState<Set<string>>(new Set())
+  const [socketConnected, setSocketConnected] = useState(false)
   const socketRef  = useRef<Socket | null>(null)
   const statusRef  = useRef<UserStatus>(currentStatus)
   statusRef.current = currentStatus
@@ -26,7 +27,7 @@ export function usePresence(uid: string, currentStatus: UserStatus) {
       socketRef.current = socket
 
       socket.on('connect', () => {
-        // Only auto-set to available if user isn't manually set to busy
+        setSocketConnected(true)
         if (statusRef.current !== 'busy') {
           updateUserStatus(uid, 'available').catch(() => {})
         }
@@ -53,5 +54,5 @@ export function usePresence(uid: string, currentStatus: UserStatus) {
     }
   }, [uid])
 
-  return { onlineUids, socket: socketRef }
+  return { onlineUids, socketConnected, socket: socketRef }
 }

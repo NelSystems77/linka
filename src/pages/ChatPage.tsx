@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '@/domains/auth/hooks/useAuth'
 import { useAuthStore } from '@/domains/auth/store/auth.store'
 import { signOut } from '@/domains/auth/services/auth.service'
@@ -35,9 +36,10 @@ interface PendingRequest {
 export default function ChatPage() {
   const { user }  = useAuth()
   const setUser   = useAuthStore(s => s.setUser)
+  const location  = useLocation()
   const [ownStatus, setOwnStatus] = useState<UserStatus>(user?.status ?? 'available')
 
-  const { onlineUids }     = usePresence(user?.uid ?? '', ownStatus)
+  const { onlineUids, socketConnected } = usePresence(user?.uid ?? '', ownStatus)
   const { incomingRequests } = useChatRequests(user?.uid ?? '')
   const { rooms }          = useRooms(user?.uid ?? '')
   const { users }          = useUsers(user?.uid ?? '')
@@ -114,6 +116,18 @@ export default function ChatPage() {
       setReqFeedback('No se pudo enviar la solicitud')
     }
   }, [user, view, onlineUids])
+
+  // Auto-initiate chat when arriving from the admin panel
+  const autoSelectedRef = useRef(false)
+  useEffect(() => {
+    const autoSelectUid = (location.state as { autoSelectUid?: string } | null)?.autoSelectUid
+    if (!autoSelectUid || autoSelectedRef.current || !socketConnected || users.length === 0) return
+    const target = users.find(u => u.uid === autoSelectUid)
+    if (!target) return
+    autoSelectedRef.current = true
+    window.history.replaceState({}, '')
+    handleSelectUser(target)
+  }, [location.state, socketConnected, users, handleSelectUser])
 
   const handleRequestAccepted = useCallback(async (conversationId: string, fromUid: string) => {
     const sender = users.find(u => u.uid === fromUid)

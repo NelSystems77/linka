@@ -50,7 +50,8 @@ service cloud.firestore {
       // users can only update their own lastSeenAt
       allow update: if isSuperAdmin()
         || (isAdmin() && isActive() && !('role' in request.resource.data.diff(resource.data).affectedKeys()))
-        || (isSelf(userId) && isActive() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeenAt']));
+        || (isSelf(userId) && isActive() && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['lastSeenAt', 'mustChangePassword', 'publicKey', 'status', 'avatarUrl']));
     }
 
     // ── Conversations ─────────────────────────────────────────────────────

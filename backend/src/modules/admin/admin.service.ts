@@ -45,6 +45,7 @@ export class AdminService {
       isBlocked:          false,
       lastSeenAt:         now,
       mustChangePassword: true,
+      status:             'offline',
     }
 
     await this.firebase.firestore.collection(USERS).doc(fbUser.uid).set(userData)

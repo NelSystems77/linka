@@ -1,0 +1,108 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function userDoc(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function isSelf(userId) {
+      return uid() == userId;
+    }
+
+    function role() {
+      return userDoc(uid()).role;
+    }
+
+    function isActive() {
+      let u = userDoc(uid());
+      return !u.isBlocked &&
+             (u.expiresAt == null || u.expiresAt > request.time.toMillis());
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && role() == 'super_admin';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (role() == 'admin' || role() == 'super_admin');
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Any authenticated active user can read any user profile (to get public key)
+      allow read: if isSignedIn() && isActive();
+
+      // Only super_admin can create or delete users
+      allow create, delete: if isSuperAdmin();
+
+      // super_admin can update anything; admin can update limited fields;
+      // users can only update their own lastSeenAt
+      allow update: if isSuperAdmin()
+        || (isAdmin() && isActive() && !('role' in request.resource.data.diff(resource.data).affectedKeys()))
+        || (isSelf(userId) && isActive() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeenAt']));
+    }
+
+    // ── Conversations ─────────────────────────────────────────────────────
+    match /conversations/{convId} {
+      allow read, create: if isSignedIn() && isActive()
+        && uid() in resource.data.participants;
+
+      allow update: if isSignedIn() && isActive()
+        && uid() in resource.data.participants
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt']);
+
+      allow delete: if false;  // conversations are never deleted
+    }
+
+    // ── Messages ──────────────────────────────────────────────────────────
+    match /messages/{msgId} {
+      function convParticipants() {
+        return get(/databases/$(database)/documents/conversations/$(resource.data.conversationId)).data.participants;
+      }
+
+      // Only participants of the conversation can read
+      allow read: if isSignedIn() && isActive()
+        && uid() in convParticipants();
+
+      // Only the sender can create a message in a conversation they're in
+      allow create: if isSignedIn() && isActive()
+        && request.resource.data.senderId == uid()
+        && uid() in get(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)).data.participants;
+
+      // Messages are immutable once written (E2EE integrity)
+      allow update, delete: if false;
+    }
+
+    // ── Files ─────────────────────────────────────────────────────────────
+    match /files/{fileId} {
+      function fileConvParticipants() {
+        return get(/databases/$(database)/documents/conversations/$(resource.data.conversationId)).data.participants;
+      }
+
+      allow read: if isSignedIn() && isActive()
+        && uid() in fileConvParticipants();
+
+      allow create: if isSignedIn() && isActive()
+        && request.resource.data.uploadedBy == uid();
+
+      allow update, delete: if false;
+    }
+
+    // ── Audit Log ─────────────────────────────────────────────────────────
+    match /auditLog/{logId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;  // written only by backend (Firebase Admin SDK)
+    }
+  }
+}

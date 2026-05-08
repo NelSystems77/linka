@@ -15,6 +15,32 @@ import { firestore } from '@/core/config/firebase.config'
 import type { AppUser } from '@/domains/users/types/user.types'
 import type { LoginCredentials } from '../types/auth.types'
 
+// Deduplication: if both signIn and useAuthBootstrap call ensureE2eeKeys concurrently
+// (which happens during explicit login), they share the same promise to avoid generating
+// two different key pairs.
+let _keyBootstrapPromise: Promise<void> | null = null
+
+export function ensureE2eeKeys(uid: string, publicKeyInFirestore: string): Promise<void> {
+  if (!_keyBootstrapPromise) {
+    _keyBootstrapPromise = _doEnsureE2eeKeys(uid, publicKeyInFirestore).finally(() => {
+      _keyBootstrapPromise = null
+    })
+  }
+  return _keyBootstrapPromise
+}
+
+async function _doEnsureE2eeKeys(uid: string, publicKeyInFirestore: string): Promise<void> {
+  const existingPair = await getStoredKeyPair(uid)
+  if (!existingPair) {
+    // No key in IndexedDB (first login or browser data cleared) → generate and upload
+    const publicKey = await generateAndStoreKeyPair(uid)
+    await updateDoc(doc(firestore, 'users', uid), { publicKey })
+  } else if (!publicKeyInFirestore || publicKeyInFirestore !== existingPair.publicKeySpki) {
+    // Firestore is empty OR has a different key (logged in from another device) → sync current device's key
+    await updateDoc(doc(firestore, 'users', uid), { publicKey: existingPair.publicKeySpki })
+  }
+}
+
 export async function signIn(credentials: LoginCredentials): Promise<AppUser> {
   const { user: fbUser } = await signInWithEmailAndPassword(
     auth,
@@ -26,16 +52,7 @@ export async function signIn(credentials: LoginCredentials): Promise<AppUser> {
   if (!appUser) throw new Error('Perfil de usuario no encontrado.')
   if (!isAccountActive(appUser)) throw new Error('Cuenta expirada o bloqueada.')
 
-  // Bootstrap E2EE keys — generate if missing from IndexedDB, sync Firestore if out of date
-  const existingPair = await getStoredKeyPair(fbUser.uid)
-  if (!existingPair) {
-    const publicKey = await generateAndStoreKeyPair(fbUser.uid)
-    await updateDoc(doc(firestore, 'users', fbUser.uid), { publicKey })
-  } else if (!appUser.publicKey) {
-    // Key exists in IndexedDB but Firestore is empty — sync it
-    await updateDoc(doc(firestore, 'users', fbUser.uid), { publicKey: existingPair.publicKeySpki })
-  }
-
+  await ensureE2eeKeys(fbUser.uid, appUser.publicKey)
   await updateLastSeen(fbUser.uid)
   return appUser
 }

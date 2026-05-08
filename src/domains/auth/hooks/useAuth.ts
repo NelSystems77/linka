@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useAuthStore } from '../store/auth.store'
-import { onAuthChange, signOut } from '../services/auth.service'
+import { onAuthChange, signOut, ensureE2eeKeys } from '../services/auth.service'
 import { getUserById, isAccountActive } from '@/domains/users/services/users.service'
 
 export function useAuthBootstrap() {
@@ -16,6 +16,10 @@ export function useAuthBootstrap() {
         setUser(null)
         return
       }
+
+      // Sync E2EE keys on every auth state change (covers session restore, incognito,
+      // and the concurrent call with signIn — deduplication ensures a single key pair).
+      await ensureE2eeKeys(fbUser.uid, appUser.publicKey).catch(console.error)
       setUser(appUser)
     })
     return unsub

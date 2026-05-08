@@ -56,8 +56,11 @@ service cloud.firestore {
 
     // ── Conversations ─────────────────────────────────────────────────────
     match /conversations/{convId} {
-      allow read, create: if isSignedIn() && isActive()
+      allow read: if isSignedIn() && isActive()
         && uid() in resource.data.participants;
+
+      allow create: if isSignedIn() && isActive()
+        && uid() in request.resource.data.participants;
 
       allow update: if isSignedIn() && isActive()
         && uid() in resource.data.participants

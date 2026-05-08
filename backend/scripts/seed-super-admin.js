@@ -54,8 +54,10 @@ async function seed() {
     createdAt:      now,
     expiresAt:      null,
     renewalHistory: [],
-    isBlocked:      false,
-    lastSeenAt:     now,
+    isBlocked:          false,
+    lastSeenAt:         now,
+    mustChangePassword: false,
+    status:             'offline',
   })
   console.log('✓ Firestore users document created')
   console.log(`\n  Email:    ${EMAIL}`)

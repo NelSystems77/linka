@@ -100,6 +100,21 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Chat Requests ─────────────────────────────────────────────────────────
+    match /chatRequests/{requestId} {
+      allow read: if isSignedIn() && isActive()
+        && (resource.data.fromUid == uid() || resource.data.toUid == uid());
+
+      allow create: if isSignedIn() && isActive()
+        && request.resource.data.fromUid == uid();
+
+      allow update: if isSignedIn() && isActive()
+        && (resource.data.fromUid == uid() || resource.data.toUid == uid())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+
+      allow delete: if false;
+    }
+
     // ── Audit Log ─────────────────────────────────────────────────────────
     match /auditLog/{logId} {
       allow read: if isSuperAdmin();

@@ -3,18 +3,20 @@ import { useAuthStore } from './auth.store'
 import type { AppUser } from '@/domains/users/types/user.types'
 
 const MOCK_USER: AppUser = {
-  uid:            'uid-001',
-  email:          'admin@linka.app',
-  displayName:    'Nelson Admin',
-  avatarUrl:      null,
-  role:           'super_admin',
-  plan:           'full',
-  publicKey:      'spki-base64',
-  createdAt:      1_700_000_000_000,
-  expiresAt:      null,
-  renewalHistory: [],
-  isBlocked:      false,
-  lastSeenAt:     Date.now(),
+  uid:                'uid-001',
+  email:              'admin@linka.app',
+  displayName:        'Nelson Admin',
+  avatarUrl:          null,
+  role:               'super_admin',
+  plan:               'full',
+  publicKey:          'spki-base64',
+  createdAt:          1_700_000_000_000,
+  expiresAt:          null,
+  renewalHistory:     [],
+  isBlocked:          false,
+  lastSeenAt:         Date.now(),
+  mustChangePassword: false,
+  status:             'offline',
 }
 
 beforeEach(() => {

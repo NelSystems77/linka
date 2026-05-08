@@ -20,18 +20,20 @@ import { getDoc, updateDoc } from 'firebase/firestore'
 // ── Fixtures ───────────────────────────────────────────────────────────────
 function makeUser(overrides: Partial<AppUser> = {}): AppUser {
   return {
-    uid:            'uid-test',
-    email:          'test@linka.app',
-    displayName:    'Test User',
-    avatarUrl:      null,
-    role:           'user',
-    plan:           'free',
-    publicKey:      'base64-spki',
-    createdAt:      Date.now() - 86_400_000,
-    expiresAt:      Date.now() + 30 * 86_400_000,   // 30 days from now
-    renewalHistory: [],
-    isBlocked:      false,
-    lastSeenAt:     Date.now(),
+    uid:                'uid-test',
+    email:              'test@linka.app',
+    displayName:        'Test User',
+    avatarUrl:          null,
+    role:               'user',
+    plan:               'free',
+    publicKey:          'base64-spki',
+    createdAt:          Date.now() - 86_400_000,
+    expiresAt:          Date.now() + 30 * 86_400_000,
+    renewalHistory:     [],
+    isBlocked:          false,
+    lastSeenAt:         Date.now(),
+    mustChangePassword: false,
+    status:             'offline',
     ...overrides,
   }
 }
@@ -98,7 +100,7 @@ describe('renewUser', () => {
     const after = Date.now()
 
     const call    = vi.mocked(updateDoc).mock.calls[0]!
-    const payload = call[1] as Record<string, unknown>
+    const payload = call[1] as unknown as Record<string, unknown>
     const newExpiry = payload['expiresAt'] as number
 
     const expectedMs = 3 * 30 * 24 * 60 * 60 * 1000
@@ -114,7 +116,7 @@ describe('renewUser', () => {
     await renewUser('uid-test', 6, 'admin-uid')
 
     const call    = vi.mocked(updateDoc).mock.calls[0]!
-    const payload = call[1] as Record<string, unknown>
+    const payload = call[1] as unknown as Record<string, unknown>
     const history = payload['renewalHistory'] as unknown[]
 
     expect(history).toHaveLength(1)
@@ -130,7 +132,7 @@ describe('renewUser', () => {
     await renewUser('uid-test', 3, 'admin-uid')
 
     const call    = vi.mocked(updateDoc).mock.calls[0]!
-    const payload = call[1] as Record<string, unknown>
+    const payload = call[1] as unknown as Record<string, unknown>
     expect(payload['isBlocked']).toBe(false)
   })
 

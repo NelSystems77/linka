@@ -4,7 +4,7 @@ import { onAuthChange, signOut } from '../services/auth.service'
 import { getUserById, isAccountActive } from '@/domains/users/services/users.service'
 
 export function useAuthBootstrap() {
-  const { setUser, setLoading } = useAuthStore()
+  const { setUser } = useAuthStore()
 
   useEffect(() => {
     const unsub = onAuthChange(async fbUser => {

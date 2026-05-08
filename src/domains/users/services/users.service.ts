@@ -49,6 +49,7 @@ export async function createUser(
     renewalHistory: [{ renewedAt: Date.now(), cycleMonths: payload.cycleMonths, renewedBy: 'system' }],
     isBlocked: false,
     lastSeenAt: Date.now(),
+    mustChangePassword: true,
     status: 'offline',
   }
   await setDoc(doc(firestore, COL, uid), user)

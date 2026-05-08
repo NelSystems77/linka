@@ -5,18 +5,20 @@ import UserCard from './UserCard'
 import type { AppUser } from '../types/user.types'
 
 const BASE_USER: AppUser = {
-  uid:            'uid-001',
-  email:          'carlos@empresa.com',
-  displayName:    'Carlos Martínez',
-  avatarUrl:      null,
-  role:           'user',
-  plan:           'full',
-  publicKey:      'spki-base64',
-  createdAt:      Date.now() - 86_400_000,
-  expiresAt:      Date.now() + 30 * 86_400_000,
-  renewalHistory: [],
-  isBlocked:      false,
-  lastSeenAt:     Date.now(),
+  uid:                'uid-001',
+  email:              'carlos@empresa.com',
+  displayName:        'Carlos Martínez',
+  avatarUrl:          null,
+  role:               'user',
+  plan:               'full',
+  publicKey:          'spki-base64',
+  createdAt:          Date.now() - 86_400_000,
+  expiresAt:          Date.now() + 30 * 86_400_000,
+  renewalHistory:     [],
+  isBlocked:          false,
+  lastSeenAt:         Date.now(),
+  mustChangePassword: false,
+  status:             'available',
 }
 
 describe('UserCard', () => {

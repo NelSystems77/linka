@@ -12,8 +12,9 @@ const ACTION_META: Record<AdminAction, { label: string; icon: string; color: str
   'user.unblock':     { label: 'Cuenta desbloqueada', icon: '✅', color: 'text-green-400' },
   'user.renew':       { label: 'Acceso renovado',   icon: '🔄', color: 'text-brand-400'  },
   'user.delete':      { label: 'Usuario eliminado', icon: '🗑',  color: 'text-red-400'    },
-  'user.role_change': { label: 'Rol modificado',    icon: '🏷',  color: 'text-amber-400'  },
-  'admin.login':      { label: 'Inicio de sesión',  icon: '🔑', color: 'text-slate-400'  },
+  'user.role_change':     { label: 'Rol modificado',       icon: '🏷',  color: 'text-amber-400'  },
+  'user.password_reset':  { label: 'Contraseña reseteada', icon: '🔐', color: 'text-orange-400' },
+  'admin.login':          { label: 'Inicio de sesión',     icon: '🔑', color: 'text-slate-400'  },
 }
 
 export default function AuditLog({ entries }: Props) {

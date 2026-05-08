@@ -14,7 +14,6 @@ import {
 } from '@/domains/messaging/services/chatRequest.service'
 import { getOrCreateConversation } from '@/domains/messaging/services/messaging.service'
 import UserList from '@/domains/users/components/UserList'
-import UserCard from '@/domains/users/components/UserCard'
 import StatusSelector from '@/domains/users/components/StatusSelector'
 import ChatWindow from '@/domains/messaging/components/ChatWindow'
 import RoomWindow from '@/domains/messaging/components/RoomWindow'
@@ -31,15 +30,6 @@ type ActiveView =
 interface PendingRequest {
   requestId: string
   target: AppUser
-}
-
-const AVATAR_GRADIENTS = [
-  'from-violet-600 to-indigo-700', 'from-blue-600 to-cyan-700',
-  'from-emerald-600 to-teal-700',  'from-rose-600 to-pink-700',
-  'from-amber-600 to-orange-700',  'from-fuchsia-600 to-purple-700',
-]
-function avatarGradient(name: string) {
-  return AVATAR_GRADIENTS[(name.charCodeAt(0) || 0) % AVATAR_GRADIENTS.length]!
 }
 
 export default function ChatPage() {

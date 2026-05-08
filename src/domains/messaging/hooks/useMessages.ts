@@ -20,7 +20,9 @@ export function useMessages(conversationId: string, uid: string, plan: 'free' | 
             } satisfies DecryptedMessage
           }
           const slot    = m.encryptedPayload[uid]
-          const content = slot ? (await decryptMessage(slot, uid)) ?? '[sin acceso]' : '[sin acceso]'
+          const content = slot
+            ? (await decryptMessage(slot, uid).catch(() => null)) ?? '[sin acceso]'
+            : '[sin acceso]'
           return { ...m, content } satisfies DecryptedMessage
         })
       )

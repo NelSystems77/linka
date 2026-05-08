@@ -25,7 +25,9 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
 }
 
 export async function generateAndStoreKeyPair(uid: string): Promise<string> {
-  const keyPair = await crypto.subtle.generateKey(RSA_PARAMS, false, ['encrypt', 'decrypt'])
+  // extractable: true is required so we can exportKey('spki') the public half on all browsers.
+  // The private key is never exported by our code — it stays in IndexedDB as an opaque CryptoKey.
+  const keyPair = await crypto.subtle.generateKey(RSA_PARAMS, true, ['encrypt', 'decrypt'])
 
   const publicKeySpki = arrayBufferToBase64(
     await crypto.subtle.exportKey('spki', keyPair.publicKey)

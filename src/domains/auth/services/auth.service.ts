@@ -26,11 +26,14 @@ export async function signIn(credentials: LoginCredentials): Promise<AppUser> {
   if (!appUser) throw new Error('Perfil de usuario no encontrado.')
   if (!isAccountActive(appUser)) throw new Error('Cuenta expirada o bloqueada.')
 
-  // Bootstrap E2EE keys on first login from this device
+  // Bootstrap E2EE keys — generate if missing from IndexedDB, sync Firestore if out of date
   const existingPair = await getStoredKeyPair(fbUser.uid)
   if (!existingPair) {
     const publicKey = await generateAndStoreKeyPair(fbUser.uid)
     await updateDoc(doc(firestore, 'users', fbUser.uid), { publicKey })
+  } else if (!appUser.publicKey) {
+    // Key exists in IndexedDB but Firestore is empty — sync it
+    await updateDoc(doc(firestore, 'users', fbUser.uid), { publicKey: existingPair.publicKeySpki })
   }
 
   await updateLastSeen(fbUser.uid)

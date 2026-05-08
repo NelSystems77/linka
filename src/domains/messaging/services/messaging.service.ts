@@ -117,7 +117,15 @@ export function subscribeToMessages(
 
   return onSnapshot(q, snap => {
     const msgs: Message[] = snap.docs
-      .map(d => ({ id: d.id, ...d.data() } as Message))
+      .map(d => {
+        const data = d.data()
+        return {
+          id: d.id,
+          ...data,
+          // serverTimestamp() returns a Firestore Timestamp object, not a number
+          createdAt: data.createdAt?.toMillis?.() ?? Date.now(),
+        } as Message
+      })
       .filter(m => m.expiresAt === null || m.expiresAt > now.toMillis())
     callback(msgs)
   })

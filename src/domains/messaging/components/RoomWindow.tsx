@@ -11,9 +11,10 @@ interface Props {
   room: Conversation
   currentUser: AppUser
   onExit: () => void
+  onBack?: () => void
 }
 
-export default function RoomWindow({ room, currentUser, onExit }: Props) {
+export default function RoomWindow({ room, currentUser, onExit, onBack }: Props) {
   const { messages, loading, sendRoom } = useMessages(room.id, currentUser.uid, currentUser.plan)
   const [showMembers, setShowMembers] = useState(false)
   const [confirming, setConfirming]   = useState<'leave' | 'dissolve' | null>(null)
@@ -21,7 +22,7 @@ export default function RoomWindow({ room, currentUser, onExit }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
   }, [messages.length])
 
   async function handleSendText(text: string) {
@@ -64,8 +65,21 @@ export default function RoomWindow({ room, currentUser, onExit }: Props) {
     <div className="flex flex-col h-full">
 
       {/* ── Room header ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.05] shrink-0"
+      <div className="flex items-center gap-3 px-3 md:px-5 py-3 border-b border-white/[0.05] shrink-0"
            style={{ background: '#0d1321' }}>
+
+        {/* Back button — mobile only */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="md:hidden shrink-0 w-8 h-8 flex items-center justify-center rounded-full
+                       text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
 
         {/* Room icon */}
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-600 to-violet-700

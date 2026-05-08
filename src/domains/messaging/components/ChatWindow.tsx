@@ -10,6 +10,7 @@ interface Props {
   conversationId: string
   currentUser: AppUser
   recipient: AppUser
+  onBack?: () => void
 }
 
 const AVATAR_GRADIENTS = [
@@ -28,13 +29,13 @@ function avatarGradient(name: string): string {
   return AVATAR_GRADIENTS[idx]!
 }
 
-export default function ChatWindow({ conversationId, currentUser, recipient }: Props) {
+export default function ChatWindow({ conversationId, currentUser, recipient, onBack }: Props) {
   const { messages, loading, send } = useMessages(conversationId, currentUser.uid, currentUser.plan)
   const { upload, download, uploading, downloading } = useFileUpload()
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior })
   }, [messages.length])
 
   async function handleSendText(text: string) {
@@ -80,8 +81,21 @@ export default function ChatWindow({ conversationId, currentUser, recipient }: P
     <div className="flex flex-col h-full">
 
       {/* ── Chat header ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.05] shrink-0"
+      <div className="flex items-center gap-3 px-3 md:px-5 py-3 border-b border-white/[0.05] shrink-0"
            style={{ background: '#0d1321' }}>
+
+        {/* Back button — mobile only */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="md:hidden shrink-0 w-8 h-8 flex items-center justify-center rounded-full
+                       text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
 
         {/* Recipient avatar */}
         <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradient}

@@ -45,11 +45,22 @@ export default function ChatPage() {
   const { users }          = useUsers(user?.uid ?? '')
 
   const [view, setView]               = useState<ActiveView>({ kind: 'empty' })
+  const [mobileChatOpen, setMobileChatOpen] = useState(false)
   const [search, setSearch]           = useState('')
   const [pendingReq, setPendingReq]   = useState<PendingRequest | null>(null)
   const [reqFeedback, setReqFeedback] = useState<string>('')
   const [loadingConv, setLoadingConv] = useState(false)
   const [showRoomModal, setShowRoomModal] = useState(false)
+
+  function openView(v: ActiveView) {
+    setView(v)
+    if (v.kind !== 'empty') setMobileChatOpen(true)
+  }
+
+  function handleMobileBack() {
+    setMobileChatOpen(false)
+    setView({ kind: 'empty' })
+  }
 
   // Feedback toast auto-dismiss
   useEffect(() => {
@@ -79,7 +90,7 @@ export default function ChatPage() {
         try {
           setLoadingConv(true)
           const convId = await getOrCreateConversation(user!.uid, pendingReq.target.uid)
-          setView({ kind: 'direct', conversationId: convId, recipient: pendingReq.target })
+          openView({ kind: 'direct', conversationId: convId, recipient: pendingReq.target })
         } finally {
           setLoadingConv(false)
         }
@@ -132,7 +143,7 @@ export default function ChatPage() {
   const handleRequestAccepted = useCallback(async (conversationId: string, fromUid: string) => {
     const sender = users.find(u => u.uid === fromUid)
     if (!sender) return
-    setView({ kind: 'direct', conversationId, recipient: sender })
+    openView({ kind: 'direct', conversationId, recipient: sender })
   }, [users])
 
   function handleStatusChange(status: UserStatus) {
@@ -155,7 +166,7 @@ export default function ChatPage() {
   const activeRecipUid  = view.kind === 'direct' ? view.recipient.uid      : null
 
   return (
-    <div className="h-screen flex bg-surface overflow-hidden">
+    <div className="h-dvh flex bg-surface overflow-hidden">
 
       {/* ── Incoming request popup ──────────────────────────────────── */}
       {incomingRequests.length > 0 && (
@@ -172,7 +183,7 @@ export default function ChatPage() {
           currentUser={user}
           onCreated={roomId => {
             const room = rooms.find(r => r.id === roomId)
-            if (room) setView({ kind: 'room', room })
+            if (room) openView({ kind: 'room', room })
             setShowRoomModal(false)
           }}
           onClose={() => setShowRoomModal(false)}
@@ -180,8 +191,11 @@ export default function ChatPage() {
       )}
 
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
-      <aside className="w-[320px] flex flex-col shrink-0 border-r border-white/[0.05]"
-             style={{ background: '#0c1220' }}>
+      <aside
+        className={`${mobileChatOpen ? 'hidden' : 'flex'} md:flex flex-col
+                    w-full md:w-[320px] shrink-0 border-r border-white/[0.05]`}
+        style={{ background: '#0c1220' }}
+      >
 
         {/* Header */}
         <div className="px-4 py-3 border-b border-white/[0.05] shrink-0"
@@ -278,7 +292,7 @@ export default function ChatPage() {
               {rooms.map(room => (
                 <button
                   key={room.id}
-                  onClick={() => setView({ kind: 'room', room })}
+                  onClick={() => openView({ kind: 'room', room })}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-left
                               transition-colors duration-100 relative
                               ${activeRoomId === room.id ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]'}`}
@@ -335,7 +349,9 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Main area ────────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col min-w-0 bg-surface relative">
+      <main
+        className={`${mobileChatOpen ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-w-0 bg-surface relative`}
+      >
 
         {/* Request feedback toast */}
         {reqFeedback && (
@@ -361,12 +377,14 @@ export default function ChatPage() {
             conversationId={view.conversationId}
             currentUser={user}
             recipient={view.recipient}
+            onBack={handleMobileBack}
           />
         ) : view.kind === 'room' ? (
           <RoomWindow
             room={view.room}
             currentUser={user}
-            onExit={() => setView({ kind: 'empty' })}
+            onExit={() => { setMobileChatOpen(false); setView({ kind: 'empty' }) }}
+            onBack={handleMobileBack}
           />
         ) : (
           /* ── Empty state ── */

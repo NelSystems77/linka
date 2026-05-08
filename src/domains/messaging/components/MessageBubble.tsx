@@ -114,7 +114,9 @@ export default function MessageBubble({ message, isMine, onDownloadFile, downloa
           isMine ? 'justify-end' : 'justify-start'
         )}>
           <span className="text-[10px] opacity-50 select-none tabular-nums">
-            {format(new Date(message.createdAt), 'HH:mm', { locale: es })}
+            {message.createdAt
+              ? format(new Date(message.createdAt), 'HH:mm', { locale: es })
+              : ''}
           </span>
           {isExpiring && (
             <span className="opacity-40" title="Mensaje temporal — se elimina en 24 h">

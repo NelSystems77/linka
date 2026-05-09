@@ -42,7 +42,7 @@ export default function AdminDashboard() {
   const {
     users, auditLog, stats,
     loading, submitting, error,
-    createUser, blockUser, unblockUser, renewUser, deleteUser,
+    createUser, blockUser, unblockUser, renewUser, deleteUser, clearAuditLog,
   } = useAdmin()
 
   const { user }  = useAuth()
@@ -278,7 +278,7 @@ export default function AdminDashboard() {
             onDelete={deleteUser}
           />
         ) : (
-          <AuditLog entries={auditLog} />
+          <AuditLog entries={auditLog} onClear={clearAuditLog} submitting={submitting} />
         )}
       </main>
 

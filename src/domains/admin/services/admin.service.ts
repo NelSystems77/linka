@@ -35,4 +35,5 @@ export const adminService = {
   resetUserPassword: (uid: string, temporaryPassword: string)    => apiFetch<void>(`/admin/users/${uid}/reset-password`, { method: 'PATCH', body: JSON.stringify({ temporaryPassword }) }),
   deleteUser:        (uid: string)                               => apiFetch<void>(`/admin/users/${uid}`,                { method: 'DELETE' }),
   getAuditLog:       ()                                          => apiFetch<AuditLogEntry[]>('/admin/audit-log'),
+  clearAuditLog:     ()                                          => apiFetch<void>('/admin/audit-log', { method: 'DELETE' }),
 }

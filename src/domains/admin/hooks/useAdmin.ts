@@ -61,6 +61,18 @@ export function useAdmin() {
     await adminService.renewUser(uid, cycle)
     await loadAuditLog()
   })
+  const clearAuditLog     = useCallback(async () => {
+    setSubmitting(true)
+    setError(null)
+    try {
+      await adminService.clearAuditLog()
+      setAuditLog([])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al borrar el registro')
+    } finally {
+      setSubmitting(false)
+    }
+  }, [])
 
   const stats = {
     total:   users.length,
@@ -73,6 +85,7 @@ export function useAdmin() {
     users, auditLog, stats,
     loading, submitting, error,
     createUser, blockUser, unblockUser, renewUser, deleteUser, resetUserPassword,
+    clearAuditLog,
     reload: loadUsers,
   }
 }

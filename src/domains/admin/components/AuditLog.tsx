@@ -5,6 +5,8 @@ import type { AuditLogEntry, AdminAction } from '../types/admin.types'
 
 interface Props {
   entries: AuditLogEntry[]
+  onClear?: () => Promise<void>
+  submitting?: boolean
 }
 
 const ACTION_META: Record<AdminAction, { label: string; color: string; bg: string; iconPath: string }> = {
@@ -60,9 +62,17 @@ const ACTION_META: Record<AdminAction, { label: string; color: string; bg: strin
 
 const PAGE_SIZE = 20
 
-export default function AuditLog({ entries }: Props) {
+export default function AuditLog({ entries, onClear, submitting }: Props) {
   const [page, setPage] = useState(1)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
+
+  async function handleClear() {
+    if (!onClear) return
+    await onClear()
+    setConfirmClear(false)
+    setPage(1)
+  }
 
   if (entries.length === 0) {
     return (
@@ -85,14 +95,55 @@ export default function AuditLog({ entries }: Props) {
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-slate-600">
           Mostrando <span className="text-slate-400 font-medium">{visible.length}</span> de{' '}
           <span className="text-slate-400 font-medium">{entries.length}</span> eventos
         </p>
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400/60 animate-pulse" />
-          <span className="text-[10px] text-slate-600">Tiempo real</span>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400/60 animate-pulse" />
+            <span className="text-[10px] text-slate-600">Tiempo real</span>
+          </div>
+
+          {/* Clear button */}
+          {onClear && !confirmClear && (
+            <button
+              onClick={() => setConfirmClear(true)}
+              disabled={submitting}
+              className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg
+                         border border-red-500/20 text-red-400 hover:bg-red-500/10
+                         transition-all duration-150 disabled:opacity-40"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Borrar registro
+            </button>
+          )}
+
+          {/* Confirm clear */}
+          {onClear && confirmClear && (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 animate-fade-in">
+              <span className="text-[11px] text-red-400">¿Borrar todos los logs?</span>
+              <button
+                onClick={handleClear}
+                disabled={submitting}
+                className="text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors disabled:opacity-40"
+              >
+                {submitting ? 'Borrando…' : 'Confirmar'}
+              </button>
+              <button
+                onClick={() => setConfirmClear(false)}
+                disabled={submitting}
+                className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

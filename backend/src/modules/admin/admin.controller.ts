@@ -71,4 +71,11 @@ export class AdminController {
   getAuditLog() {
     return this.adminService.getAuditLog()
   }
+
+  @Delete('audit-log')
+  @Roles('super_admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  clearAuditLog() {
+    return this.adminService.clearAuditLog()
+  }
 }

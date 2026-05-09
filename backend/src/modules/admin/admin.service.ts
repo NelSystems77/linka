@@ -123,6 +123,17 @@ export class AdminService {
     })
   }
 
+  async clearAuditLog() {
+    const snap = await this.firebase.firestore.collection(AUDIT_LOG).get()
+    const BATCH_SIZE = 500
+    const docs = snap.docs
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const batch = this.firebase.firestore.batch()
+      docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref))
+      await batch.commit()
+    }
+  }
+
   // ── Private ───────────────────────────────────────────────────────────────
 
   private async assertUserExists(uid: string) {

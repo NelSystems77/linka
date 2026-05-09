@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/domains/auth/hooks/useAuth'
 import { useAuthStore } from '@/domains/auth/store/auth.store'
 import { signOut } from '@/domains/auth/services/auth.service'
@@ -39,8 +39,10 @@ interface PendingRequest {
 
 export default function ChatPage() {
   const { user }  = useAuth()
+  const { isAdmin } = useAuth()
   const setUser   = useAuthStore(s => s.setUser)
   const location  = useLocation()
+  const navigate  = useNavigate()
   const [ownStatus, setOwnStatus] = useState<UserStatus>(user?.status ?? 'available')
 
   const { onlineUids, socketConnected } = usePresence(user?.uid ?? '', ownStatus)
@@ -392,7 +394,22 @@ export default function ChatPage() {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-white/[0.04] shrink-0">
+        <div className="px-4 py-3 border-t border-white/[0.04] shrink-0 space-y-2">
+          {/* Dashboard button — visible only for admin / super_admin */}
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/admin')}
+              className="w-full flex items-center justify-center gap-2 text-xs px-3 py-2
+                         rounded-xl border border-white/[0.07] text-slate-400
+                         hover:text-white hover:bg-white/[0.05] transition-all duration-150"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Panel de administración
+            </button>
+          )}
           <div className="flex items-center justify-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-400/60" />
             <p className="text-[10px] text-slate-700 tracking-wide">
@@ -468,6 +485,21 @@ export default function ChatPage() {
                             rounded-xl px-4 py-2.5 leading-relaxed">
                 Plan Free: mensajes y archivos se eliminan a las 24 h.
               </p>
+            )}
+            {/* Back to dashboard — visible only for admin / super_admin */}
+            {isAdmin && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="mt-5 w-full flex items-center justify-center gap-2 text-xs px-4 py-2.5
+                           rounded-xl border border-white/[0.08] text-slate-400
+                           hover:text-white hover:bg-white/[0.05] transition-all duration-150"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Volver al panel de administración
+              </button>
             )}
           </div>
         )}

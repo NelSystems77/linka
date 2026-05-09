@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
 import { useAdmin } from '../hooks/useAdmin'
 import { useAuth } from '@/domains/auth/hooks/useAuth'
@@ -42,6 +43,7 @@ export default function AdminDashboard() {
 
   const { user }  = useAuth()
   const setUser   = useAuthStore(s => s.setUser)
+  const navigate  = useNavigate()
   const [tab,             setTab]             = useState<Tab>('users')
   const [showCreateModal,    setShowCreateModal]    = useState(false)
   const [showStartChatModal, setShowStartChatModal] = useState(false)
@@ -75,6 +77,21 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Go to Chat */}
+            <button
+              onClick={() => navigate('/chat')}
+              className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl
+                         border border-white/[0.08] text-slate-400 hover:text-white
+                         hover:bg-white/[0.05] transition-all duration-150"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M15 19l-7-7 7-7" />
+              </svg>
+              Ir al chat
+            </button>
+
+            {/* Start chat modal */}
             <button
               onClick={() => setShowStartChatModal(true)}
               className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl

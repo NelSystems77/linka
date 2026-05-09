@@ -54,7 +54,7 @@ service cloud.firestore {
               .hasOnly(['lastSeenAt', 'mustChangePassword', 'publicKey', 'status', 'avatarUrl']));
     }
 
-    // ── Conversations ─────────────────────────────────────────────────────
+    // ── Conversations ─────────────────────────────────────────────────
     match /conversations/{convId} {
       allow read: if isSignedIn() && isActive()
         && uid() in resource.data.participants;
@@ -64,20 +64,33 @@ service cloud.firestore {
 
       allow update: if isSignedIn() && isActive()
         && uid() in resource.data.participants
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt']);
+        && (
+          // Any participant can update lastMessageAt
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt'])
+          || (
+            // A participant can remove only themselves from a room (leave)
+            resource.data.type == 'room'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
+            && request.resource.data.participants.toSet().difference(resource.data.participants.toSet()).size() == 0
+            && resource.data.participants.toSet().difference(request.resource.data.participants.toSet()) == [uid()].toSet()
+          )
+        );
 
-      allow delete: if false;  // conversations are never deleted
+      // Only the room creator can dissolve their own room
+      allow delete: if isSignedIn() && isActive()
+        && resource.data.type == 'room'
+        && resource.data.createdBy == uid();
     }
 
-    // ── Messages ──────────────────────────────────────────────────────────
+    // ── Messages ──────────────────────────────────────────────────────
     match /messages/{msgId} {
-      function convParticipants() {
-        return get(/databases/$(database)/documents/conversations/$(resource.data.conversationId)).data.participants;
+      function conv() {
+        return get(/databases/$(database)/documents/conversations/$(resource.data.conversationId)).data;
       }
 
       // Only participants of the conversation can read
       allow read: if isSignedIn() && isActive()
-        && uid() in convParticipants();
+        && uid() in conv().participants;
 
       // Only the sender can create a message in a conversation they're in
       allow create: if isSignedIn() && isActive()
@@ -85,7 +98,12 @@ service cloud.firestore {
         && uid() in get(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)).data.participants;
 
       // Messages are immutable once written (E2EE integrity)
-      allow update, delete: if false;
+      allow update: if false;
+
+      // Only the room creator can delete messages when dissolving
+      allow delete: if isSignedIn() && isActive()
+        && conv().type == 'room'
+        && conv().createdBy == uid();
     }
 
     // ── Files ─────────────────────────────────────────────────────────────
@@ -118,7 +136,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ── Audit Log ─────────────────────────────────────────────────────────
+    // ── Audit Log ─────────────────────────────────────────────────────
     match /auditLog/{logId} {
       allow read: if isSuperAdmin();
       allow write: if false;  // written only by backend (Firebase Admin SDK)

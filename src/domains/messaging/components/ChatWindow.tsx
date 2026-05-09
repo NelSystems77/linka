@@ -77,6 +77,18 @@ export default function ChatWindow({ conversationId, currentUser, recipient, onB
   const gradient = avatarGradient(recipient.displayName)
   const initial  = recipient.displayName[0]?.toUpperCase() ?? '?'
 
+  // Group messages by date for date separators
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  function getDateLabel(ts: number): string {
+    const d = new Date(ts)
+    if (d.toDateString() === today.toDateString()) return 'Hoy'
+    if (d.toDateString() === yesterday.toDateString()) return 'Ayer'
+    return d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })
+  }
+
   return (
     <div className="flex flex-col h-full">
 
@@ -111,41 +123,63 @@ export default function ChatWindow({ conversationId, currentUser, recipient, onB
 
         {/* E2EE badge */}
         <div className="flex items-center gap-1.5 bg-green-500/[0.08] border border-green-500/[0.15]
-                        rounded-full px-3 py-1 shrink-0">
+                        rounded-full px-2.5 py-1 shrink-0">
           <svg className="w-3 h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
-          <span className="text-[10px] text-green-400 font-medium tracking-wide">E2EE</span>
+          <span className="text-[10px] text-green-400 font-medium tracking-wide hidden sm:inline">E2EE</span>
         </div>
       </div>
 
       {/* ── Messages ─────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-1.5">
+      <div className="flex-1 overflow-y-auto py-4">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/[0.04] flex items-center justify-center">
-              <svg className="w-6 h-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+          <div className="flex flex-col items-center justify-center py-16 gap-4 px-8">
+            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient}
+                            flex items-center justify-center text-xl font-bold text-white`}>
+              {initial}
             </div>
-            <p className="text-sm text-slate-500">Di hola para comenzar</p>
+            <div className="text-center">
+              <p className="text-sm font-medium text-white mb-1">{recipient.displayName}</p>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Este es el inicio de tu conversación cifrada.<br />
+                Di hola para comenzar 👋
+              </p>
+            </div>
           </div>
         ) : (
-          messages.map(msg => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              isMine={msg.senderId === currentUser.uid}
-              onDownloadFile={fileId => download(fileId, currentUser.uid)}
-              downloadingFileId={downloading}
-            />
-          ))
+          <div className="space-y-1.5">
+            {messages.map((msg, idx) => {
+              const prevMsg = messages[idx - 1]
+              const showDateSep = !prevMsg ||
+                new Date(msg.createdAt).toDateString() !== new Date(prevMsg.createdAt).toDateString()
+
+              return (
+                <div key={msg.id}>
+                  {showDateSep && msg.createdAt && (
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className="flex-1 h-px bg-white/[0.05]" />
+                      <span className="text-[10px] text-slate-600 font-medium px-2">
+                        {getDateLabel(msg.createdAt)}
+                      </span>
+                      <div className="flex-1 h-px bg-white/[0.05]" />
+                    </div>
+                  )}
+                  <MessageBubble
+                    message={msg}
+                    isMine={msg.senderId === currentUser.uid}
+                    onDownloadFile={fileId => download(fileId, currentUser.uid)}
+                    downloadingFileId={downloading}
+                  />
+                </div>
+              )
+            })}
+          </div>
         )}
         <div ref={bottomRef} />
       </div>

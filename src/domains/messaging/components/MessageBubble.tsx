@@ -6,6 +6,7 @@ import type { DecryptedMessage } from '../types/message.types'
 interface Props {
   message: DecryptedMessage
   isMine: boolean
+  senderName?: string          // shown in group rooms for other participants
   onDownloadFile?: (fileId: string) => void
   downloadingFileId?: string | null
 }
@@ -37,21 +38,29 @@ function DownloadIcon() {
   )
 }
 
-function ClockIcon() {
-  return (
-    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  )
-}
-
 function fileTypeIcon(mimeType: string) {
   if (mimeType.startsWith('image/')) return <ImageIcon />
   return <DocIcon />
 }
 
-export default function MessageBubble({ message, isMine, onDownloadFile, downloadingFileId }: Props) {
+// Deterministic color per sender name for room chats
+const SENDER_COLORS = [
+  'text-violet-400',
+  'text-blue-400',
+  'text-emerald-400',
+  'text-rose-400',
+  'text-amber-400',
+  'text-fuchsia-400',
+  'text-sky-400',
+  'text-green-400',
+]
+
+function senderColor(name: string): string {
+  const idx = (name.charCodeAt(0) || 0) % SENDER_COLORS.length
+  return SENDER_COLORS[idx]!
+}
+
+export default function MessageBubble({ message, isMine, senderName, onDownloadFile, downloadingFileId }: Props) {
   const isExpiring = message.expiresAt !== null
 
   return (
@@ -62,6 +71,13 @@ export default function MessageBubble({ message, isMine, onDownloadFile, downloa
           ? 'bg-brand-700 text-white rounded-br-sm'
           : 'bg-[#1e2a3a] text-slate-100 rounded-bl-sm'
       )}>
+
+        {/* Sender name — shown in rooms for other participants */}
+        {!isMine && senderName && (
+          <p className={clsx('text-[11px] font-semibold mb-1 leading-none', senderColor(senderName))}>
+            {senderName}
+          </p>
+        )}
 
         {/* Text message */}
         {message.type === 'text' && (
@@ -104,6 +120,12 @@ export default function MessageBubble({ message, isMine, onDownloadFile, downloa
                   <DownloadIcon />
                 </span>
               )}
+              {isDownloading && (
+                <svg className="w-4 h-4 animate-spin opacity-60 shrink-0" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
             </button>
           )
         })()}
@@ -113,14 +135,17 @@ export default function MessageBubble({ message, isMine, onDownloadFile, downloa
           'flex items-center gap-1 mt-1',
           isMine ? 'justify-end' : 'justify-start'
         )}>
-          <span className="text-[10px] opacity-50 select-none tabular-nums">
+          <span className="text-[10px] opacity-40 select-none tabular-nums">
             {message.createdAt
               ? format(new Date(message.createdAt), 'HH:mm', { locale: es })
               : ''}
           </span>
           {isExpiring && (
-            <span className="opacity-40" title="Mensaje temporal — se elimina en 24 h">
-              <ClockIcon />
+            <span className="opacity-30" title="Mensaje temporal — se elimina en 24 h">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </span>
           )}
         </div>

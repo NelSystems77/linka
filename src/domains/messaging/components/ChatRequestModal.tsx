@@ -36,9 +36,17 @@ export default function ChatRequestModal({ requests, currentUid, onAccepted }: P
 
   if (!request || request.expiresAt < Date.now()) return null
 
-  const remaining = Math.ceil((request.expiresAt - Date.now()) / 1000)
-  const gradient  = avatarGradient(request.fromName)
-  const initials  = request.fromName.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+  const remaining  = Math.ceil((request.expiresAt - Date.now()) / 1000)
+  const progress   = (remaining / 45) * 100
+  const gradient   = avatarGradient(request.fromName)
+  const initials   = request.fromName.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+
+  // Color the countdown bar based on urgency
+  const barColor = remaining > 20
+    ? 'bg-brand-500'
+    : remaining > 10
+    ? 'bg-amber-500'
+    : 'bg-red-500'
 
   async function handleAccept() {
     if (busy) return
@@ -63,23 +71,30 @@ export default function ChatRequestModal({ requests, currentUid, onAccepted }: P
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-end p-4 pointer-events-none">
-      <div className="pointer-events-auto w-80 rounded-2xl border border-white/[0.08]
-                      bg-[#0d1626] shadow-2xl animate-fade-in overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-start justify-end p-4 pointer-events-none">
+      <div className="pointer-events-auto w-80 rounded-2xl border border-white/[0.10]
+                      bg-[#0d1626] shadow-modal animate-slide-up overflow-hidden">
 
         {/* Countdown bar */}
-        <div className="h-0.5 bg-white/[0.05]">
+        <div className="h-1 bg-white/[0.05]">
           <div
-            className="h-full bg-brand-500 transition-all duration-1000"
-            style={{ width: `${(remaining / 45) * 100}%` }}
+            className={`h-full ${barColor} transition-all duration-1000 ease-linear`}
+            style={{ width: `${progress}%` }}
           />
         </div>
 
         <div className="p-4">
           {/* Header */}
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3 font-semibold">
-            Solicitud de chat
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+              Solicitud de chat
+            </p>
+            <span className={`text-xs tabular-nums font-mono font-semibold ${
+              remaining > 20 ? 'text-slate-500' : remaining > 10 ? 'text-amber-400' : 'text-red-400'
+            }`}>
+              {remaining}s
+            </span>
+          </div>
 
           {/* Sender info */}
           <div className="flex items-center gap-3 mb-4">
@@ -87,11 +102,10 @@ export default function ChatRequestModal({ requests, currentUid, onAccepted }: P
                             flex items-center justify-center text-sm font-bold text-white shrink-0`}>
               {initials}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-white font-semibold text-sm truncate">{request.fromName}</p>
-              <p className="text-slate-400 text-xs mt-0.5">desea chatear contigo</p>
+              <p className="text-slate-400 text-xs mt-0.5">quiere chatear contigo</p>
             </div>
-            <span className="ml-auto text-xs text-slate-600 tabular-nums shrink-0">{remaining}s</span>
           </div>
 
           {/* Actions */}
@@ -100,25 +114,43 @@ export default function ChatRequestModal({ requests, currentUid, onAccepted }: P
               onClick={handleAccept}
               disabled={busy}
               className="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500
-                         text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                         text-white text-sm font-semibold transition-all duration-150
+                         disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
-              {busy ? '…' : 'Iniciar chat'}
+              {busy ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Aceptar
+                </>
+              )}
             </button>
             <button
               onClick={handleDecline}
               disabled={busy}
               className="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.10]
-                         text-slate-300 text-sm font-medium transition-colors disabled:opacity-50"
+                         text-slate-300 text-sm font-medium transition-all duration-150
+                         disabled:opacity-50"
             >
-              En otro momento
+              Rechazar
             </button>
           </div>
 
           {/* Pending count */}
           {requests.length > 1 && (
-            <p className="text-center text-[10px] text-slate-600 mt-2.5">
-              +{requests.length - 1} solicitud{requests.length > 2 ? 'es' : ''} más
-            </p>
+            <div className="flex items-center justify-center gap-1.5 mt-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />
+              <p className="text-[10px] text-slate-600">
+                +{requests.length - 1} solicitud{requests.length > 2 ? 'es' : ''} más en espera
+              </p>
+            </div>
           )}
         </div>
       </div>

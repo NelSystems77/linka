@@ -115,7 +115,12 @@ export class AdminService {
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .get()
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    return snap.docs.map(d => {
+      const data = d.data()
+      // Convert Firestore Timestamp to Unix ms so the frontend receives a plain number
+      const createdAt = data['createdAt']?.toMillis?.() ?? data['createdAt'] ?? null
+      return { id: d.id, ...data, createdAt }
+    })
   }
 
   // ── Private ───────────────────────────────────────────────────────────────

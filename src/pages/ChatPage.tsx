@@ -38,11 +38,11 @@ interface PendingRequest {
 }
 
 export default function ChatPage() {
-  const { user }  = useAuth()
+  const { user }    = useAuth()
   const { isAdmin } = useAuth()
-  const setUser   = useAuthStore(s => s.setUser)
-  const location  = useLocation()
-  const navigate  = useNavigate()
+  const setUser     = useAuthStore(s => s.setUser)
+  const location    = useLocation()
+  const navigate    = useNavigate()
   const [ownStatus, setOwnStatus] = useState<UserStatus>(user?.status ?? 'available')
 
   const { onlineUids, socketConnected } = usePresence(user?.uid ?? '', ownStatus)
@@ -50,13 +50,14 @@ export default function ChatPage() {
   const { conversations, loading: convsLoading } = useConversations(user?.uid ?? '')
   const { users } = useUsers(user?.uid ?? '')
 
-  const [view, setView]               = useState<ActiveView>({ kind: 'empty' })
+  const [view, setView]                   = useState<ActiveView>({ kind: 'empty' })
   const [mobileChatOpen, setMobileChatOpen] = useState(false)
-  const [search, setSearch]           = useState('')
-  const [pendingReq, setPendingReq]   = useState<PendingRequest | null>(null)
-  const [reqFeedback, setReqFeedback] = useState<string>('')
-  const [loadingConv, setLoadingConv] = useState(false)
+  const [search, setSearch]               = useState('')
+  const [pendingReq, setPendingReq]       = useState<PendingRequest | null>(null)
+  const [reqFeedback, setReqFeedback]     = useState<string>('')
+  const [loadingConv, setLoadingConv]     = useState(false)
   const [showRoomModal, setShowRoomModal] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   function openView(v: ActiveView) {
     setView(v)
@@ -280,21 +281,21 @@ export default function ChatPage() {
                   ? 'bg-brand-500/15 text-brand-300'
                   : 'bg-amber-500/10 text-amber-400'
               }`}>
-                {user.plan === 'full' ? 'Full' : 'Free · 24h'}
+                {user.plan === 'full' ? '✦ Full' : 'Free · 24h'}
               </span>
             </div>
 
             {/* New room button */}
             <button
               onClick={() => setShowRoomModal(true)}
-              title="Nueva sala"
+              title="Nueva sala de chat"
               className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full
                          text-slate-600 hover:text-slate-300 hover:bg-white/[0.06]
                          transition-all duration-150"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm-4-6v2m0 0v2m0-2h2m-2 0H9" />
+                  d="M12 4v16m8-8H4" />
               </svg>
             </button>
 
@@ -323,15 +324,27 @@ export default function ChatPage() {
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
+              ref={searchRef}
               type="search"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar o nueva conversación…"
               className="w-full bg-white/[0.05] border border-white/[0.06] rounded-xl
-                         pl-9 pr-3 py-2 text-sm text-slate-300 placeholder-slate-600
+                         pl-9 pr-8 py-2 text-sm text-slate-300 placeholder-slate-600
                          focus:outline-none focus:ring-1 focus:ring-brand-500/30
                          focus:border-brand-500/20 transition-all"
             />
+            {search && (
+              <button
+                onClick={() => { setSearch(''); searchRef.current?.focus() }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600
+                           hover:text-slate-400 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
@@ -362,7 +375,8 @@ export default function ChatPage() {
                   Mensajes
                 </p>
                 {totalUnread > 0 && (
-                  <span className="text-[10px] font-bold text-brand-400">
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-brand-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
                     {totalUnread} sin leer
                   </span>
                 )}
@@ -394,14 +408,14 @@ export default function ChatPage() {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-white/[0.04] shrink-0 space-y-2">
+        <div className="px-3 py-3 border-t border-white/[0.04] shrink-0 space-y-2">
           {/* Dashboard button — visible only for admin / super_admin */}
           {isAdmin && (
             <button
               onClick={() => navigate('/admin')}
-              className="w-full flex items-center justify-center gap-2 text-xs px-3 py-2
-                         rounded-xl border border-white/[0.07] text-slate-400
-                         hover:text-white hover:bg-white/[0.05] transition-all duration-150"
+              className="w-full flex items-center justify-center gap-2 text-xs px-3 py-2.5
+                         rounded-xl bg-brand-600/10 border border-brand-600/20 text-brand-400
+                         hover:bg-brand-600/20 hover:text-brand-300 transition-all duration-150"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -459,7 +473,7 @@ export default function ChatPage() {
           />
         ) : (
           /* ── Empty state ── */
-          <div className="m-auto text-center px-8 max-w-xs animate-fade-in">
+          <div className="m-auto text-center px-8 max-w-sm animate-fade-in">
             <div className="w-16 h-16 rounded-2xl bg-brand-gradient mx-auto mb-5
                             flex items-center justify-center shadow-brand-glow">
               <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -473,26 +487,43 @@ export default function ChatPage() {
             <p className="text-slate-500 text-sm leading-relaxed">
               Tus mensajes están cifrados de extremo a extremo. Ni el servidor ni el administrador pueden leerlos.
             </p>
+
+            {/* Pending request indicator */}
             {pendingReq && (
               <div className="mt-5 bg-brand-500/[0.08] border border-brand-500/15 rounded-xl px-4 py-3">
-                <p className="text-brand-300 text-xs leading-relaxed animate-pulse">
-                  Esperando respuesta de {pendingReq.target.displayName}…
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
+                  <p className="text-brand-300 text-xs font-medium">Solicitud enviada</p>
+                </div>
+                <p className="text-brand-400/70 text-xs">
+                  Esperando respuesta de <span className="text-brand-300 font-medium">{pendingReq.target.displayName}</span>…
                 </p>
               </div>
             )}
+
+            {/* Free plan notice */}
             {user.plan === 'free' && !pendingReq && (
-              <p className="text-amber-400/80 text-xs mt-5 bg-amber-500/[0.08] border border-amber-500/15
-                            rounded-xl px-4 py-2.5 leading-relaxed">
-                Plan Free: mensajes y archivos se eliminan a las 24 h.
-              </p>
+              <div className="mt-5 bg-amber-500/[0.06] border border-amber-500/15 rounded-xl px-4 py-3">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <svg className="w-3.5 h-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-amber-400 text-xs font-medium">Plan Free</p>
+                </div>
+                <p className="text-amber-400/70 text-xs leading-relaxed">
+                  Mensajes y archivos se eliminan automáticamente a las 24 h.
+                </p>
+              </div>
             )}
+
             {/* Back to dashboard — visible only for admin / super_admin */}
             {isAdmin && (
               <button
                 onClick={() => navigate('/admin')}
                 className="mt-5 w-full flex items-center justify-center gap-2 text-xs px-4 py-2.5
-                           rounded-xl border border-white/[0.08] text-slate-400
-                           hover:text-white hover:bg-white/[0.05] transition-all duration-150"
+                           rounded-xl bg-brand-600/10 border border-brand-600/20 text-brand-400
+                           hover:bg-brand-600/20 hover:text-brand-300 transition-all duration-150"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}

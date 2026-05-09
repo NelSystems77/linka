@@ -35,6 +35,12 @@ export interface Conversation {
   participants: string[]
   createdAt: number
   lastMessageAt: number
+  /** Last message preview text (decrypted snippet or system text) */
+  lastMessage?: string
+  /** UID of the sender of the last message */
+  lastMessageSenderId?: string
+  /** Type of the last message */
+  lastMessageType?: MessageType
   /** Room only */
   name?: string
   createdBy?: string

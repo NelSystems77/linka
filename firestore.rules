@@ -26,8 +26,8 @@ service cloud.firestore {
 
     function isActive() {
       let u = userDoc(uid());
-      return !u.isBlocked &&
-             (u.expiresAt == null || u.expiresAt > request.time.toMillis());
+      return u.get('isBlocked', false) == false &&
+             (!('expiresAt' in u) || u.expiresAt == null || u.expiresAt > request.time.toMillis());
     }
 
     function isSuperAdmin() {
@@ -47,7 +47,7 @@ service cloud.firestore {
       allow create, delete: if isSuperAdmin();
 
       // super_admin can update anything; admin can update limited fields;
-      // users can only update their own lastSeenAt
+      // users can only update their own profile fields
       allow update: if isSuperAdmin()
         || (isAdmin() && isActive() && !('role' in request.resource.data.diff(resource.data).affectedKeys()))
         || (isSelf(userId) && isActive() && request.resource.data.diff(resource.data).affectedKeys()
@@ -56,17 +56,20 @@ service cloud.firestore {
 
     // ── Conversations ─────────────────────────────────────────────────
     match /conversations/{convId} {
+      // Participant can read their own conversations
       allow read: if isSignedIn() && isActive()
         && uid() in resource.data.participants;
 
+      // Any authenticated active user can create a conversation they're part of
       allow create: if isSignedIn() && isActive()
         && uid() in request.resource.data.participants;
 
       allow update: if isSignedIn() && isActive()
         && uid() in resource.data.participants
         && (
-          // Any participant can update lastMessageAt and/or unreadCounts
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt', 'unreadCounts'])
+          // Any participant can update lastMessageAt and/or unreadCounts (send message, mark read)
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['lastMessageAt', 'unreadCounts', 'lastMessage', 'lastMessageSenderId', 'lastMessageType'])
           || (
             // A participant can remove only themselves from a room (leave)
             resource.data.type == 'room'
@@ -84,26 +87,30 @@ service cloud.firestore {
 
     // ── Messages ──────────────────────────────────────────────────────
     match /messages/{msgId} {
-      function conv() {
+      function convData() {
         return get(/databases/$(database)/documents/conversations/$(resource.data.conversationId)).data;
+      }
+
+      function newConvData() {
+        return get(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)).data;
       }
 
       // Only participants of the conversation can read
       allow read: if isSignedIn() && isActive()
-        && uid() in conv().participants;
+        && uid() in convData().participants;
 
       // Only the sender can create a message in a conversation they're in
       allow create: if isSignedIn() && isActive()
         && request.resource.data.senderId == uid()
-        && uid() in get(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)).data.participants;
+        && uid() in newConvData().participants;
 
       // Messages are immutable once written (E2EE integrity)
       allow update: if false;
 
       // Only the room creator can delete messages when dissolving
       allow delete: if isSignedIn() && isActive()
-        && conv().type == 'room'
-        && conv().createdBy == uid();
+        && convData().type == 'room'
+        && convData().createdBy == uid();
     }
 
     // ── Files ─────────────────────────────────────────────────────────────

@@ -38,6 +38,8 @@ export interface Conversation {
   /** Room only */
   name?: string
   createdBy?: string
+  /** Unread message count per participant uid */
+  unreadCounts?: Record<string, number>
 }
 
 export interface SendMessageInput {

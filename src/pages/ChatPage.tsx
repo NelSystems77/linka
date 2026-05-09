@@ -6,20 +6,24 @@ import { signOut } from '@/domains/auth/services/auth.service'
 import { useUsers } from '@/domains/users/hooks/useUsers'
 import { usePresence } from '@/domains/users/hooks/usePresence'
 import { useChatRequests } from '@/domains/messaging/hooks/useChatRequests'
-import { useRooms } from '@/domains/messaging/hooks/useRooms'
+import { useConversations } from '@/domains/messaging/hooks/useConversations'
 import { updateUserStatus } from '@/domains/users/services/users.service'
 import {
   sendChatRequest,
   subscribeToSentRequest,
   expireChatRequest,
 } from '@/domains/messaging/services/chatRequest.service'
-import { getOrCreateConversation } from '@/domains/messaging/services/messaging.service'
-import UserList from '@/domains/users/components/UserList'
+import {
+  getOrCreateConversation,
+  markConversationRead,
+} from '@/domains/messaging/services/messaging.service'
 import StatusSelector from '@/domains/users/components/StatusSelector'
 import ChatWindow from '@/domains/messaging/components/ChatWindow'
 import RoomWindow from '@/domains/messaging/components/RoomWindow'
 import ChatRequestModal from '@/domains/messaging/components/ChatRequestModal'
 import CreateRoomModal from '@/domains/messaging/components/CreateRoomModal'
+import ConversationList from '@/domains/messaging/components/ConversationList'
+import UserList from '@/domains/users/components/UserList'
 import type { AppUser, UserStatus } from '@/domains/users/types/user.types'
 import type { Conversation } from '@/domains/messaging/types/message.types'
 
@@ -41,8 +45,8 @@ export default function ChatPage() {
 
   const { onlineUids, socketConnected } = usePresence(user?.uid ?? '', ownStatus)
   const { incomingRequests } = useChatRequests(user?.uid ?? '')
-  const { rooms }          = useRooms(user?.uid ?? '')
-  const { users }          = useUsers(user?.uid ?? '')
+  const { conversations, loading: convsLoading } = useConversations(user?.uid ?? '')
+  const { users } = useUsers(user?.uid ?? '')
 
   const [view, setView]               = useState<ActiveView>({ kind: 'empty' })
   const [mobileChatOpen, setMobileChatOpen] = useState(false)
@@ -54,13 +58,30 @@ export default function ChatPage() {
 
   function openView(v: ActiveView) {
     setView(v)
-    if (v.kind !== 'empty') setMobileChatOpen(true)
+    if (v.kind === 'empty') return
+    setMobileChatOpen(true)
+    if (!user) return
+    if (v.kind === 'direct') {
+      markConversationRead(v.conversationId, user.uid).catch(() => {})
+    } else {
+      markConversationRead(v.room.id, user.uid).catch(() => {})
+    }
   }
 
   function handleMobileBack() {
     setMobileChatOpen(false)
     setView({ kind: 'empty' })
   }
+
+  // Auto-reset unread count when conversation is active and new messages arrive
+  useEffect(() => {
+    if (!user || view.kind === 'empty') return
+    const convId = view.kind === 'direct' ? view.conversationId : view.room.id
+    const conv = conversations.find(c => c.id === convId)
+    if (conv && (conv.unreadCounts?.[user.uid] ?? 0) > 0) {
+      markConversationRead(convId, user.uid).catch(() => {})
+    }
+  }, [conversations, view, user])
 
   // Feedback toast auto-dismiss
   useEffect(() => {
@@ -74,7 +95,6 @@ export default function ChatPage() {
   useEffect(() => {
     if (!pendingReq) return
 
-    // Auto-expire after 45 s
     const expireTimer = setTimeout(async () => {
       await expireChatRequest(pendingReq.requestId).catch(() => {})
       setPendingReq(null)
@@ -104,12 +124,41 @@ export default function ChatPage() {
     return () => { clearTimeout(expireTimer); unsub() }
   }, [pendingReq, user])
 
+  // Open a conversation from the inbox list
+  const handleSelectConversation = useCallback((conv: Conversation) => {
+    if (conv.type === 'room') {
+      openView({ kind: 'room', room: conv })
+    } else {
+      const otherUid = conv.participants.find(p => p !== user!.uid) ?? ''
+      const other = users.find(u => u.uid === otherUid)
+      if (!other) return
+      openView({ kind: 'direct', conversationId: conv.id, recipient: other })
+    }
+  }, [user, users, conversations])
+
+  // Select a contact from search results to start or resume a conversation
   const handleSelectUser = useCallback(async (contact: AppUser) => {
     if (!user) return
+    if (view.kind === 'direct' && view.recipient.uid === contact.uid) {
+      setSearch('')
+      return
+    }
 
-    // If already chatting with this user, just switch view
-    if (view.kind === 'direct' && view.recipient.uid === contact.uid) return
+    // Resume existing conversation without a new chat request
+    const sorted = [user.uid, contact.uid].sort()
+    const existing = conversations.find(
+      c => c.type === 'direct' &&
+      c.participants.length === 2 &&
+      c.participants[0] === sorted[0] &&
+      c.participants[1] === sorted[1]
+    )
+    if (existing) {
+      openView({ kind: 'direct', conversationId: existing.id, recipient: contact })
+      setSearch('')
+      return
+    }
 
+    // New conversation — requires chat request (target must be online)
     const effectiveStatus = onlineUids.has(contact.uid)
       ? (contact.status === 'busy' ? 'busy' : 'available')
       : 'offline'
@@ -119,14 +168,14 @@ export default function ChatPage() {
       return
     }
 
-    // Send chat request
     try {
       const requestId = await sendChatRequest(user.uid, user.displayName, contact.uid)
       setPendingReq({ requestId, target: contact })
+      setSearch('')
     } catch {
       setReqFeedback('No se pudo enviar la solicitud')
     }
-  }, [user, view, onlineUids])
+  }, [user, view, onlineUids, conversations])
 
   // Auto-initiate chat when arriving from the admin panel
   const autoSelectedRef = useRef(false)
@@ -162,8 +211,14 @@ export default function ChatPage() {
   const initials = user.displayName
     .split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
 
-  const activeRoomId    = view.kind === 'room'   ? view.room.id            : null
-  const activeRecipUid  = view.kind === 'direct' ? view.recipient.uid      : null
+  const activeConvId =
+    view.kind === 'direct' ? view.conversationId :
+    view.kind === 'room'   ? view.room.id :
+    null
+
+  const totalUnread = conversations.reduce(
+    (sum, c) => sum + (c.unreadCounts?.[user.uid] ?? 0), 0
+  )
 
   return (
     <div className="h-dvh flex bg-surface overflow-hidden">
@@ -182,7 +237,7 @@ export default function ChatPage() {
         <CreateRoomModal
           currentUser={user}
           onCreated={roomId => {
-            const room = rooms.find(r => r.id === roomId)
+            const room = conversations.find(c => c.id === roomId)
             if (room) openView({ kind: 'room', room })
             setShowRoomModal(false)
           }}
@@ -269,7 +324,7 @@ export default function ChatPage() {
               type="search"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar contacto…"
+              placeholder="Buscar o nueva conversación…"
               className="w-full bg-white/[0.05] border border-white/[0.06] rounded-xl
                          pl-9 pr-3 py-2 text-sm text-slate-300 placeholder-slate-600
                          focus:outline-none focus:ring-1 focus:ring-brand-500/30
@@ -280,61 +335,60 @@ export default function ChatPage() {
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto">
-
-          {/* ── Active rooms section ── */}
-          {rooms.length > 0 && (
+          {search.trim() ? (
+            /* ── Search mode: find contacts to start a new conversation ── */
             <>
               <div className="px-4 pt-2 pb-1">
                 <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold">
-                  Salas activas
+                  Nueva conversación
                 </p>
               </div>
-              {rooms.map(room => (
-                <button
-                  key={room.id}
-                  onClick={() => openView({ kind: 'room', room })}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left
-                              transition-colors duration-100 relative
-                              ${activeRoomId === room.id ? 'bg-white/[0.07]' : 'hover:bg-white/[0.04]'}`}
-                >
-                  {activeRoomId === room.id && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-9 bg-brand-500 rounded-r-full" />
-                  )}
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-brand-600 to-violet-700
-                                  flex items-center justify-center shrink-0">
-                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-medium truncate leading-snug
-                                   ${activeRoomId === room.id ? 'text-white' : 'text-slate-200'}`}>
-                      {room.name}
-                    </p>
-                    <p className="text-xs text-slate-500 truncate mt-0.5">
-                      {room.participants.length} participantes
-                    </p>
-                  </div>
-                </button>
-              ))}
+              <UserList
+                currentUid={user.uid}
+                onlineUids={onlineUids}
+                selectedUid={null}
+                filter={search}
+                pendingUid={pendingReq?.target.uid ?? null}
+                onSelect={handleSelectUser}
+              />
+            </>
+          ) : (
+            /* ── Inbox mode: list of active conversations ── */
+            <>
+              <div className="px-4 pt-2 pb-1 flex items-center justify-between">
+                <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold">
+                  Mensajes
+                </p>
+                {totalUnread > 0 && (
+                  <span className="text-[10px] font-bold text-brand-400">
+                    {totalUnread} sin leer
+                  </span>
+                )}
+              </div>
+              {convsLoading ? (
+                <div className="px-2 py-2 space-y-1">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3">
+                      <div className="w-11 h-11 rounded-full bg-white/[0.06] animate-pulse shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 rounded-full bg-white/[0.06] animate-pulse w-3/4" />
+                        <div className="h-2.5 rounded-full bg-white/[0.04] animate-pulse w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ConversationList
+                  conversations={conversations}
+                  users={users}
+                  currentUid={user.uid}
+                  onlineUids={onlineUids}
+                  activeConvId={activeConvId}
+                  onSelect={handleSelectConversation}
+                />
+              )}
             </>
           )}
-
-          {/* ── Contacts section ── */}
-          <div className="px-4 pt-2 pb-1">
-            <p className="text-[10px] text-slate-600 uppercase tracking-widest font-semibold">
-              Contactos
-            </p>
-          </div>
-          <UserList
-            currentUid={user.uid}
-            onlineUids={onlineUids}
-            selectedUid={activeRecipUid}
-            filter={search}
-            pendingUid={pendingReq?.target.uid ?? null}
-            onSelect={handleSelectUser}
-          />
         </div>
 
         {/* Footer */}
@@ -397,7 +451,7 @@ export default function ChatPage() {
               </svg>
             </div>
             <h2 className="text-white font-semibold text-base mb-2">
-              Selecciona un contacto
+              Seleccioná una conversación
             </h2>
             <p className="text-slate-500 text-sm leading-relaxed">
               Tus mensajes están cifrados de extremo a extremo. Ni el servidor ni el administrador pueden leerlos.

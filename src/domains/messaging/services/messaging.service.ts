@@ -1,7 +1,7 @@
 import {
   collection, doc, addDoc, query,
   where, orderBy, onSnapshot, updateDoc,
-  serverTimestamp, Timestamp, getDocs
+  serverTimestamp, Timestamp, getDocs, increment
 } from 'firebase/firestore'
 import { firestore } from '@/core/config/firebase.config'
 import { encryptMessage, type Participant } from '@/domains/crypto/services/e2ee.service'
@@ -66,6 +66,7 @@ export async function sendMessage(
 
   await updateDoc(doc(firestore, 'conversations', input.conversationId), {
     lastMessageAt: serverTimestamp(),
+    [`unreadCounts.${input.recipientId}`]: increment(1),
   })
 }
 
@@ -94,8 +95,21 @@ export async function sendRoomMessage(
     expiresAt,
   })
 
+  const unreadIncrements: Record<string, ReturnType<typeof increment>> = {}
+  for (const p of input.participantUids) {
+    if (p !== input.senderId) {
+      unreadIncrements[`unreadCounts.${p}`] = increment(1)
+    }
+  }
   await updateDoc(doc(firestore, 'conversations', input.conversationId), {
     lastMessageAt: serverTimestamp(),
+    ...unreadIncrements,
+  })
+}
+
+export async function markConversationRead(conversationId: string, uid: string): Promise<void> {
+  await updateDoc(doc(firestore, 'conversations', conversationId), {
+    [`unreadCounts.${uid}`]: 0,
   })
 }
 

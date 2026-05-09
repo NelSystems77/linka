@@ -65,8 +65,8 @@ service cloud.firestore {
       allow update: if isSignedIn() && isActive()
         && uid() in resource.data.participants
         && (
-          // Any participant can update lastMessageAt
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt'])
+          // Any participant can update lastMessageAt and/or unreadCounts
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt', 'unreadCounts'])
           || (
             // A participant can remove only themselves from a room (leave)
             resource.data.type == 'room'

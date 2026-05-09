@@ -75,7 +75,8 @@ export class AdminController {
   @Delete('audit-log')
   @Roles('super_admin')
   @HttpCode(HttpStatus.NO_CONTENT)
-  clearAuditLog() {
-    return this.adminService.clearAuditLog()
+  clearAuditLog(@Body() body?: { ids?: string[] }) {
+    const ids = body?.ids && body.ids.length > 0 ? body.ids : undefined
+    return this.adminService.clearAuditLog(ids)
   }
 }

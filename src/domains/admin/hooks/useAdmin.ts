@@ -61,12 +61,17 @@ export function useAdmin() {
     await adminService.renewUser(uid, cycle)
     await loadAuditLog()
   })
-  const clearAuditLog     = useCallback(async () => {
+  const clearAuditLog     = useCallback(async (ids?: string[]) => {
     setSubmitting(true)
     setError(null)
     try {
-      await adminService.clearAuditLog()
-      setAuditLog([])
+      await adminService.clearAuditLog(ids)
+      if (ids && ids.length > 0) {
+        // Remove only the deleted entries from local state
+        setAuditLog(prev => prev.filter(e => !ids.includes(e.id)))
+      } else {
+        setAuditLog([])
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al borrar el registro')
     } finally {

@@ -5,7 +5,7 @@ import type { AuditLogEntry, AdminAction } from '../types/admin.types'
 
 interface Props {
   entries: AuditLogEntry[]
-  onClear?: () => Promise<void>
+  onClear?: (ids?: string[]) => Promise<void>
   submitting?: boolean
 }
 
@@ -62,17 +62,76 @@ const ACTION_META: Record<AdminAction, { label: string; color: string; bg: strin
 
 const PAGE_SIZE = 20
 
+// Helper to convert any createdAt value to a Date
+const toDate = (val: unknown): Date | null => {
+  if (!val) return null
+  if (val instanceof Date) return val
+  if (typeof val === 'object' && '_seconds' in (val as object)) {
+    return new Date((val as { _seconds: number })._seconds * 1000)
+  }
+  const d = new Date(val as string | number)
+  return isNaN(d.getTime()) ? null : d
+}
+
 export default function AuditLog({ entries, onClear, submitting }: Props) {
   const [page, setPage] = useState(1)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [confirmClear, setConfirmClear] = useState(false)
 
-  async function handleClear() {
+  // Selection state
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Confirm dialogs
+  const [confirmClearAll, setConfirmClearAll] = useState(false)
+  const [confirmClearSelected, setConfirmClearSelected] = useState(false)
+
+  const totalPages = Math.ceil(entries.length / PAGE_SIZE)
+  const visible = entries.slice(0, page * PAGE_SIZE)
+  const hasMore = page < totalPages
+
+  // ── Selection helpers ──────────────────────────────────────────────────────
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === visible.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(visible.map(e => e.id)))
+    }
+  }
+
+  function exitSelectionMode() {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+    setConfirmClearSelected(false)
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  async function handleClearAll() {
     if (!onClear) return
     await onClear()
-    setConfirmClear(false)
+    setConfirmClearAll(false)
     setPage(1)
+    exitSelectionMode()
   }
+
+  async function handleClearSelected() {
+    if (!onClear || selectedIds.size === 0) return
+    await onClear(Array.from(selectedIds))
+    setConfirmClearSelected(false)
+    exitSelectionMode()
+  }
+
+  // ── Empty state ────────────────────────────────────────────────────────────
 
   if (entries.length === 0) {
     return (
@@ -88,58 +147,171 @@ export default function AuditLog({ entries, onClear, submitting }: Props) {
     )
   }
 
-  const totalPages = Math.ceil(entries.length / PAGE_SIZE)
-  const visible = entries.slice(0, page * PAGE_SIZE)
-  const hasMore = page < totalPages
+  const allVisibleSelected = visible.length > 0 && selectedIds.size === visible.length
+  const someSelected = selectedIds.size > 0 && !allVisibleSelected
 
   return (
     <div className="space-y-3">
-      {/* Header */}
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-slate-600">
           Mostrando <span className="text-slate-400 font-medium">{visible.length}</span> de{' '}
           <span className="text-slate-400 font-medium">{entries.length}</span> eventos
+          {selectionMode && selectedIds.size > 0 && (
+            <span className="text-brand-400 font-medium ml-2">
+              · {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+            </span>
+          )}
         </p>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400/60 animate-pulse" />
-            <span className="text-[10px] text-slate-600">Tiempo real</span>
-          </div>
-
-          {/* Clear button */}
-          {onClear && !confirmClear && (
-            <button
-              onClick={() => setConfirmClear(true)}
-              disabled={submitting}
-              className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg
-                         border border-red-500/20 text-red-400 hover:bg-red-500/10
-                         transition-all duration-150 disabled:opacity-40"
-            >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Borrar registro
-            </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Real-time indicator */}
+          {!selectionMode && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400/60 animate-pulse" />
+              <span className="text-[10px] text-slate-600">Tiempo real</span>
+            </div>
           )}
 
-          {/* Confirm clear */}
-          {onClear && confirmClear && (
-            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 animate-fade-in">
-              <span className="text-[11px] text-red-400">¿Borrar todos los logs?</span>
+          {/* ── Normal mode buttons ── */}
+          {!selectionMode && onClear && (
+            <>
+              {/* Select mode toggle */}
               <button
-                onClick={handleClear}
+                onClick={() => { setSelectionMode(true); setConfirmClearAll(false) }}
                 disabled={submitting}
-                className="text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg
+                           border border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.05]
+                           transition-all duration-150 disabled:opacity-40"
               >
-                {submitting ? 'Borrando…' : 'Confirmar'}
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Seleccionar
               </button>
+
+              {/* Clear all button */}
+              {!confirmClearAll && (
+                <button
+                  onClick={() => setConfirmClearAll(true)}
+                  disabled={submitting}
+                  className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg
+                             border border-red-500/20 text-red-400 hover:bg-red-500/10
+                             transition-all duration-150 disabled:opacity-40"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Borrar todo
+                </button>
+              )}
+
+              {/* Confirm clear all */}
+              {confirmClearAll && (
+                <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 animate-fade-in">
+                  <span className="text-[11px] text-red-400">¿Borrar todos los logs?</span>
+                  <button
+                    onClick={handleClearAll}
+                    disabled={submitting}
+                    className="text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors disabled:opacity-40"
+                  >
+                    {submitting ? 'Borrando…' : 'Confirmar'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmClearAll(false)}
+                    disabled={submitting}
+                    className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Selection mode toolbar ── */}
+          {selectionMode && (
+            <div className="flex items-center gap-2 flex-wrap animate-fade-in">
+              {/* Select all toggle */}
               <button
-                onClick={() => setConfirmClear(false)}
+                onClick={toggleSelectAll}
                 disabled={submitting}
-                className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+                className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg
+                           border border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.05]
+                           transition-all duration-150 disabled:opacity-40"
               >
+                <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors
+                  ${allVisibleSelected
+                    ? 'bg-brand-500 border-brand-500'
+                    : someSelected
+                      ? 'bg-brand-500/30 border-brand-500/60'
+                      : 'border-white/20'
+                  }`}
+                >
+                  {(allVisibleSelected || someSelected) && (
+                    <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3}
+                        d={allVisibleSelected ? 'M5 13l4 4L19 7' : 'M20 12H4'} />
+                    </svg>
+                  )}
+                </span>
+                {allVisibleSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+              </button>
+
+              {/* Delete selected */}
+              {selectedIds.size > 0 && !confirmClearSelected && (
+                <button
+                  onClick={() => setConfirmClearSelected(true)}
+                  disabled={submitting}
+                  className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg
+                             border border-red-500/20 text-red-400 hover:bg-red-500/10
+                             transition-all duration-150 disabled:opacity-40"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Borrar {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+                </button>
+              )}
+
+              {/* Confirm delete selected */}
+              {confirmClearSelected && (
+                <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 animate-fade-in">
+                  <span className="text-[11px] text-red-400">
+                    ¿Borrar {selectedIds.size} log{selectedIds.size !== 1 ? 's' : ''}?
+                  </span>
+                  <button
+                    onClick={handleClearSelected}
+                    disabled={submitting}
+                    className="text-[11px] font-semibold text-red-400 hover:text-red-300 transition-colors disabled:opacity-40"
+                  >
+                    {submitting ? 'Borrando…' : 'Confirmar'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmClearSelected(false)}
+                    disabled={submitting}
+                    className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+
+              {/* Cancel selection mode */}
+              <button
+                onClick={exitSelectionMode}
+                disabled={submitting}
+                className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg
+                           border border-white/[0.08] text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]
+                           transition-all duration-150 disabled:opacity-40"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
                 Cancelar
               </button>
             </div>
@@ -147,7 +319,7 @@ export default function AuditLog({ entries, onClear, submitting }: Props) {
         </div>
       </div>
 
-      {/* Entries */}
+      {/* ── Entries ── */}
       <div className="space-y-2">
         {visible.map(entry => {
           const meta = ACTION_META[entry.action] ?? {
@@ -155,19 +327,6 @@ export default function AuditLog({ entries, onClear, submitting }: Props) {
             color: 'text-slate-400',
             bg: 'bg-slate-500/10 border-slate-500/20',
             iconPath: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-          }
-
-          // createdAt may arrive as a Firestore Timestamp object { _seconds, _nanoseconds },
-          // a plain Unix ms number, an ISO string, or null/undefined.
-          const toDate = (val: unknown): Date | null => {
-            if (!val) return null
-            if (val instanceof Date) return val
-            // Firestore Timestamp serialised to JSON: { _seconds: number, _nanoseconds: number }
-            if (typeof val === 'object' && '_seconds' in (val as object)) {
-              return new Date((val as { _seconds: number })._seconds * 1000)
-            }
-            const d = new Date(val as string | number)
-            return isNaN(d.getTime()) ? null : d
           }
 
           const dateObj = toDate(entry.createdAt)
@@ -182,14 +341,41 @@ export default function AuditLog({ entries, onClear, submitting }: Props) {
 
           const hasMetadata = Object.keys(entry.metadata).length > 0
           const isExpanded = expandedId === entry.id
+          const isSelected = selectedIds.has(entry.id)
 
           return (
             <div
               key={entry.id}
-              className="glass rounded-xl border border-white/[0.06] hover:border-white/[0.10]
-                         transition-all duration-150 overflow-hidden"
+              className={`glass rounded-xl border transition-all duration-150 overflow-hidden
+                ${isSelected
+                  ? 'border-brand-500/40 bg-brand-500/5'
+                  : 'border-white/[0.06] hover:border-white/[0.10]'
+                }`}
             >
-              <div className="flex items-start gap-4 p-4">
+              <div className="flex items-start gap-3 p-4">
+
+                {/* Checkbox (selection mode) */}
+                {selectionMode && (
+                  <button
+                    onClick={() => toggleSelect(entry.id)}
+                    className="mt-0.5 shrink-0 focus:outline-none"
+                    aria-label={isSelected ? 'Deseleccionar' : 'Seleccionar'}
+                  >
+                    <span className={`w-4 h-4 rounded border flex items-center justify-center transition-colors
+                      ${isSelected
+                        ? 'bg-brand-500 border-brand-500'
+                        : 'border-white/20 hover:border-white/40'
+                      }`}
+                    >
+                      {isSelected && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                  </button>
+                )}
+
                 {/* Icon */}
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${meta.bg}`}>
                   <svg className={`w-4 h-4 ${meta.color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -270,7 +456,7 @@ export default function AuditLog({ entries, onClear, submitting }: Props) {
         })}
       </div>
 
-      {/* Load more */}
+      {/* ── Load more ── */}
       {hasMore && (
         <button
           onClick={() => setPage(p => p + 1)}

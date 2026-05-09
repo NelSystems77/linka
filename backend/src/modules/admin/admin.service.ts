@@ -123,14 +123,28 @@ export class AdminService {
     })
   }
 
-  async clearAuditLog() {
-    const snap = await this.firebase.firestore.collection(AUDIT_LOG).get()
+  async clearAuditLog(ids?: string[]) {
     const BATCH_SIZE = 500
-    const docs = snap.docs
-    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
-      const batch = this.firebase.firestore.batch()
-      docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref))
-      await batch.commit()
+
+    if (ids && ids.length > 0) {
+      // Selective deletion: only delete the specified document IDs
+      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+        const batch = this.firebase.firestore.batch()
+        ids.slice(i, i + BATCH_SIZE).forEach(id => {
+          const ref = this.firebase.firestore.collection(AUDIT_LOG).doc(id)
+          batch.delete(ref)
+        })
+        await batch.commit()
+      }
+    } else {
+      // Delete all logs
+      const snap = await this.firebase.firestore.collection(AUDIT_LOG).get()
+      const docs = snap.docs
+      for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+        const batch = this.firebase.firestore.batch()
+        docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref))
+        await batch.commit()
+      }
     }
   }
 
